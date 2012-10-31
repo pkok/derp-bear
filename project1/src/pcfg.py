@@ -76,7 +76,7 @@ def extract_rules(tree_collection):
             pcfg[node_label] = {TOTAL: 0}
         if child_labels not in pcfg[node_label]:
             pcfg[node_label][child_labels] = 0
-        pcfg[node_label][child_label] += 1
+        pcfg[node_label][child_labels] += 1
         pcfg[node_label][TOTAL] += 1
         # TODO post-process frequencies?
     return pcfg
