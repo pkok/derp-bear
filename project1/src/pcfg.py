@@ -5,7 +5,6 @@ It is basically a dumbed-down version of the S-expression parser provided as
 an example of the pyparsing module.  This example is available at:
     http://pyparsing.wikispaces.com/file/view/sexpParser.py
 """
-import pprint
 import pyparsing
 
 # Define punctuation literals
@@ -20,6 +19,8 @@ string_ = pyparsing.Optional(display) + token
 sexp = pyparsing.Forward()
 sexpList = pyparsing.Group(LPAR + pyparsing.ZeroOrMore(sexp) + RPAR)
 sexp << (string_ | sexpList)
+
+TOTAL = float('NaN')
 
 def get_tree(text_tree):
     """Returns a nested list of strings representing a textual parse tree.
@@ -38,3 +39,44 @@ def get_tree(text_tree):
             ['TOP', ['INTJ', ['UH, 'damn'], ['.', '!']]]
     """
     return sexp.parseString(text_tree, parseAll=True).asList()[0]
+
+def extract_rules(tree_collection):
+    """Extracts the frequency of node transitions.
+    
+    Args:
+        tree_collection: an iterable of syntax trees, such as those outputted
+        by get_tree.
+
+    Returns:
+        A ``2D'' dictionary, where the first entry represents the starting node, and
+        the second key refers to the set of child nodes.  The associated value
+        is the frequency of this transition.
+
+        Each starting node entry contains a special entry, which contains the
+        total frequency of the starting node.
+    """
+    pcfg = {}
+    queue = list(tree_collection)
+    while queue:
+        node = queue.pop()
+        # Skip leafs/terminal nodes
+        if len(node) <= 1:
+            continue
+
+        node_label = node[0]
+        child_labels = []
+        for child in node[1:]:
+            if isinstance(child, basestring):
+                child_labels.append(child)
+            else:
+                child_labels.append(child[0])
+                queue.append(child)
+        child_labels = tuple(child_labels)
+        if node_label not in pcfg:
+            pcfg[node_label] = {TOTAL: 0}
+        if child_labels not in pcfg[node_label]:
+            pcfg[node_label][child_labels] = 0
+        pcfg[node_label][child_label] += 1
+        pcfg[node_label][TOTAL] += 1
+        # TODO post-process frequencies?
+    return pcfg
