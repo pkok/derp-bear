@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 import cPickle
+import os
 
-import tree_parser
+import pcfg
 
 PICKLE_SUFFIX = os.path.extsep + "pkl"
 PCFG_FN = "pcfg" + PICKLE_SUFFIX
@@ -20,12 +21,12 @@ def step1(train_file):
         train_trees = cPickle.load(open(TRAIN_TREES_FN))
     else:
         print "Interpreting each training tree..."
-        train_trees = [get_tree(line) for line in open(train_file)]
+        train_trees = [pcfg.get_tree(line) for line in open(train_file)]
         cPickle.dump(train_trees, open(TRAIN_TREES_FN, 'w'))
     print "Extracting rules from the parse trees..."
-    pcfg = extract_rules(forest)
-    cPickle.dump(pcfg, open(PCFG_FN, 'w'))
-    return pcfg
+    grammar = pcfg.extract_rules(forest)
+    cPickle.dump(grammar, open(PCFG_FN, 'w'))
+    return grammar
 
 def main():
     """Main method, doing all steps of the project after each other."""
