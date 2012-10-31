@@ -24,7 +24,7 @@ def step1(train_file):
         train_trees = [pcfg.get_tree(line) for line in open(train_file)]
         cPickle.dump(train_trees, open(TRAIN_TREES_FN, 'w'))
     print "Extracting rules from the parse trees..."
-    grammar = pcfg.extract_rules(forest)
+    grammar = pcfg.extract_rules(train_trees)
     cPickle.dump(grammar, open(PCFG_FN, 'w'))
     return grammar
 
