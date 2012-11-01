@@ -23,7 +23,7 @@ sexp << (string_ | sexpList)
 TOTAL = float('NaN')
 
 def get_tree(text_tree):
-    """Returns a nested list of strings representing a textual parse tree.
+    """Returns a nested list of strings representing the textual parse tree.
 
     The tokens are not interpreted.  For example, numerical-valued leaf nodes
     are still represented as strings in the tree.
@@ -39,6 +39,23 @@ def get_tree(text_tree):
             ['TOP', ['INTJ', ['UH, 'damn'], ['.', '!']]]
     """
     return sexp.parseString(text_tree, parseAll=True).asList()[0]
+
+def parse_tree_file(tree_file):
+    """Parse every line of the given file into a nested list of strings.
+
+    This returns a generator of nested lists of strings.  Each element
+    represents a single tree from the input file.
+
+    Args:
+        tree_file: a file where every line contains an s-expression,
+            representing a parse tree.
+
+    Returns: 
+        A generator which contains a nested list representation of the
+        tree/s-expression which is on each single line of the file.
+    """
+    for text_tree in tree_file:
+        yield get_tree(text_tree)
 
 def extract_rules(tree_collection):
     """Extracts the frequency of node transitions.
