@@ -5,6 +5,8 @@ It is basically a dumbed-down version of the S-expression parser provided as
 an example of the pyparsing module.  This example is available at:
     http://pyparsing.wikispaces.com/file/view/sexpParser.py
 """
+import collections
+
 import pyparsing
 
 # Define punctuation literals
@@ -20,7 +22,11 @@ sexp = pyparsing.Forward()
 sexpList = pyparsing.Group(LPAR + pyparsing.ZeroOrMore(sexp) + RPAR)
 sexp << (string_ | sexpList)
 
-TOTAL = float('NaN')
+class TOTAL: 
+    """Used as a symbolic value in the rule table of probabilistic grammars.
+    """
+    pass
+
 
 def get_tree(text_tree):
     """Returns a nested list of strings representing the textual parse tree.
@@ -40,6 +46,7 @@ def get_tree(text_tree):
     """
     return sexp.parseString(text_tree, parseAll=True).asList()[0]
 
+
 def parse_tree_file(tree_file):
     """Parse every line of the given file into a nested list of strings.
 
@@ -57,7 +64,8 @@ def parse_tree_file(tree_file):
     for text_tree in tree_file:
         yield get_tree(text_tree)
 
-def extract_rules(tree_collection):
+
+def deduce_grammar(tree_collection):
     """Extracts the frequency of node transitions.
     
     Args:
@@ -72,8 +80,12 @@ def extract_rules(tree_collection):
         Each starting node entry contains a special entry, which contains the
         total frequency of the starting node.
     """
-    pcfg = {}
     queue = list(tree_collection)
+
+    terminal_symbols = []
+    nonterminal_symbols = []
+    rules = {}
+    start_symbol = queue[0][0]
     while queue:
         node = queue.pop()
         # Skip leafs/terminal nodes
@@ -82,18 +94,24 @@ def extract_rules(tree_collection):
 
         node_label = node[0]
         child_labels = []
-        for child in node[1:]:
-            if isinstance(child, basestring):
-                child_labels.append(child)
-            else:
+        if isinstance(node[1], basestring):
+            terminal_symbols.append(node_label)
+            child_labels = node[1]
+        else:
+            nonterminal_symbols.append(node_label)
+            for child in node[1:]:
                 child_labels.append(child[0])
                 queue.append(child)
-        child_labels = tuple(child_labels)
-        if node_label not in pcfg:
-            pcfg[node_label] = {TOTAL: 0}
-        if child_labels not in pcfg[node_label]:
-            pcfg[node_label][child_labels] = 0
-        pcfg[node_label][child_labels] += 1
-        pcfg[node_label][TOTAL] += 1
-        # TODO post-process frequencies?
-    return pcfg
+            child_labels = tuple(child_labels)
+        if node_label not in rules:
+            rules[node_label] = collections.Counter();
+        rules[node_label][child_labels] += 1
+        rules[node_label][TOTAL] += 1.0
+    for node_label in rules:
+        for child_labels in rules[node_label]:
+            if child_labels != TOTAL:
+                rules[node_label][child_labels] /= rules[node_label][TOTAL]
+    grammar = {'terminals': set(terminal_symbols), 
+        'nonterminals': set(nonterminal_symbols), 'rules': rules, 
+        'start_symbol': start_symbol}
+    return grammar
