@@ -93,12 +93,12 @@ def deduce_grammar(tree_collection):
             continue
 
         node_label = node[0]
+        nonterminal_symbols.append(node_label)
         child_labels = []
         if isinstance(node[1], basestring):
-            terminal_symbols.append(node_label)
             child_labels = node[1]
+            terminal_symbols.append(child_labels)
         else:
-            nonterminal_symbols.append(node_label)
             for child in node[1:]:
                 child_labels.append(child[0])
                 queue.append(child)
