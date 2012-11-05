@@ -84,7 +84,7 @@ def deduce_grammar(tree_collection):
 
     terminal_symbols = []
     nonterminal_symbols = []
-    rules = {}
+    rules = {} #collections.defaultdict(lambda: collections.defaultdict(float))
     start_symbol = queue[0][0]
     while queue:
         node = queue.pop()
@@ -104,7 +104,9 @@ def deduce_grammar(tree_collection):
                 queue.append(child)
             child_labels = tuple(child_labels)
         if node_label not in rules:
-            rules[node_label] = collections.Counter();
+            rules[node_label] = {TOTAL: 0.0}
+        if child_labels not in rules[node_label]:
+            rules[node_label][child_labels] = 0
         rules[node_label][child_labels] += 1
         rules[node_label][TOTAL] += 1.0
     for node_label in rules:
@@ -115,3 +117,82 @@ def deduce_grammar(tree_collection):
         'nonterminals': set(nonterminal_symbols), 'rules': rules, 
         'start_symbol': start_symbol}
     return grammar
+
+
+"""Keeps returning only {}... p is never updated. Implementation according to Jurafsky and Martin, but unsure how to initialize p.
+def cyk_parser(grammar, tokens):
+    p = collections.defaultdict(float)
+    pi = collections.defaultdict(float)
+    backpointers = {}
+
+    nonterminals = grammar['nonterminals']
+    rules = grammar['rules']
+
+    for (index, token) in enumerate(tokens):
+        for symbol in nonterminals:
+            if token in rules[symbol]:
+                pi[index, index, symbol] = rules[symbol][token]
+
+    for j in xrange(1, len(tokens)):
+        for i in xrange(len(tokens)-j):
+            for k in xrange(j-2):
+                for A in nonterminals:
+                    for B in nonterminals:
+                        for C in nonterminals:
+                            prob = pi[i, k, B] * p[i+k, j-k, C] * \
+                                rules[A].get((B, C), 0.0)
+                            if p[i+k, j-k, C] > 0.0:
+                                print 'p[i+k, j-k, C] = %f' % pi[i+k, j-k, C]
+                            if prob > 0.0: 
+                                print 'prob = %f' % prob
+                            if prob > pi[i, j, A]:
+                                pi[i, j, A] = prob
+                                backpointers[i, j, A] = (k, A, B)
+    return backpointers
+"""
+
+def cyk_parser(grammar, tokens):
+    score = collections.defaultdict(float)
+    back = {}
+    rules = grammar['rules']
+    nonterminals = grammar['nonterminals']
+    for index, token in enumerate(tokens):
+        for nonterminal in nonterminals:
+            if token in rules[nonterminal]:
+                score[index, index+1, nonterminal] = rules[nonterminal][token]
+        added = True
+        while added:
+            added = False
+            for A in nonterminals:
+                for B in nonterminals:
+                    if score[index, index+1, B] > 0 and B in rules[A]:
+                        prob = rules[A][B] * score[index, index+1, B]
+                        if prob > score[index, index+1, A]:
+                            score[index, index+1, A] = prob
+                            back[index, index+1, A] = B
+                            added = True
+    for span in xrange(2, len(tokens)):
+        for begin in xrange(0, len(tokens) - span):
+            end = begin + span
+            for split in xrange(begin+1, end-1):
+                for A in nonterminals:
+                    for B in nonterminals:
+                        for C in nonterminals:
+                            prob = score[begin, split, B]
+                            prob *= score[split, end, C]
+                            prob *= rules[A].get((B, C), 0.0)
+                            if prob > score[begin, end, A]:
+                                score[begin, end, A] = prob
+                                back[begin, end, A] = (split, B, C)
+                added = True
+                while added:
+                    added = False
+                    for A in nonterminals:
+                        for B in nonterminals:
+                            prob = rules[A].get((B, ), 0.0)
+                            prob *= score[begin, end, B]
+                            if prob > score[begin, end, A]:
+                                score[begin, end, A] = prob
+                                back[begin, end, A] = B
+                                added = True
+    return score, back
