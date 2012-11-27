@@ -3,12 +3,14 @@ import argparse
 import cPickle
 import os
 
-import parser
+import parsing
 import smoothing
 
 PICKLE_SUFFIX = os.path.extsep + "pkl"
 PCFG_FILE = "pcfg" + PICKLE_SUFFIX
 TRAIN_TREES_FILE = "train_trees" + PICKLE_SUFFIX
+
+cache_files = [PCFG_FILE, TRAIN_TREES_FILE]
 
 def no_pickles():
     """Remove all pickled files, so there is no cached data."""
@@ -28,12 +30,24 @@ def step1(train_file):
         train_trees = cPickle.load(open(TRAIN_TREES_FILE))
     else:
         print "Interpreting each training tree..."
-        train_trees = parser.parse_tree_file(train_file)
+        train_trees = list(parsing.parse_tree_file(train_file))
         cPickle.dump(train_trees, open(TRAIN_TREES_FILE, 'w'))
     print "Extracting rules from the parse trees..."
-    grammar = parser.extract_rules(train_trees)
+    grammar = parsing.deduce_grammar(train_trees)
     cPickle.dump(grammar, open(PCFG_FILE, 'w'))
     return grammar
+
+def step2(grammar, tokens):
+    """Computes the top production rules of a tokenized sentence.
+
+    To do so, it computes the whole parse forest of the tokens (a list of
+    strings, representing the sentence).  The forest complies to the given
+    grammar.
+    """
+    chart = parsing.cky_parser(grammar, tokens)
+    if grammar['start_symbol'] not in chart[0, len(tokens)]:
+        raise RuntimeError("No start symbol found in chart")
+    return chart[0, len(tokens)][grammar['start_symbol']].keys()
 
 def main():
     """Main method, doing all steps of the project after each other.
@@ -49,18 +63,47 @@ def main():
         sys.exit(1)
 
     argument_parser = argparse.ArgumentParser(description="")
+
     argument_parser.add_argument(
-        "-f", "--file", dest="input_file", type=file, required=True
-        help="Location of parse trees meant for training.")
+        "-t", "--treebank", dest="treebank", type=file, required=True,
+        help="Location of parse trees meant for training the PCFG.")
+    argument_parser.add_argument(
+        "-i", "--input", dest="input", type=file, required=True,
+        help="Location of input sentences.")
+    argument_parser.add_argument(
+        "-o", "--output", dest="output", type=lambda x: file(x, 'w'),
+        required=True,
+        help="File which will contain the generated top productions")
     argument_parser.add_argument(
         "-s", "--smooth", dest="smoothing", type=str.lower, 
         choices=smoothing.functions.keys(),
-        default='none',
-        help="Smoothing model of the probabilities")
-    args = argument_parser.parse_arguments()
+        default="none",
+        help="Smoothing model of the probabilities.")
+    argument_parser.add_argument(
+        "-C", "--clear", dest="clear_cache", action="store_true",
+        help="Delete cached files and generate new ones.")
+    args = argument_parser.parse_args()
+
+    if args.clear_cache:
+        for cache_file in cache_files:
+            try:
+                os.remove(cache_file)
+            except:
+                pass
 
     smoothing_fn = smoothing.functions[args.smoothing]
-    pcfg = smoothing_fn(step1(args.input_file))
+    pcfg = smoothing_fn(step1(args.treebank))
+
+    top_productions = []
+    for i, line in enumerate(args.input):
+        try:
+            top_productions.append(step2(pcfg, line.split()))
+            print i
+        except RuntimeError as e:
+            top_productions.append("")
+            print i, ":("
+    arg.output.writelines(str(top_production))
+    return top_productions
 
 
 if __name__ == "__main__":
