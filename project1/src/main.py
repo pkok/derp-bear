@@ -94,17 +94,18 @@ def main():
     smoothing_fn = smoothing.functions[args.smoothing]
     pcfg = smoothing_fn(step1(args.treebank))
 
+    print "Starting to parse. Line numbers of failed sentences are printed."
+
     top_productions = []
     for i, line in enumerate(args.input):
         try:
             top_productions.append(step2(pcfg, line.split()))
-            print i
         except RuntimeError as e:
             top_productions.append("")
             print i, ":("
-    arg.output.writelines(str(top_production))
+    args.output.writelines(str(top_productions))
     return top_productions
 
 
 if __name__ == "__main__":
-    main();
+    main()
