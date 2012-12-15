@@ -215,7 +215,7 @@ def rulebased_postag(token):
             return postags
     raise RuntimeError("Unknown token: %s" % token)
 
-def check_unaries(grammar, chart, begin, end):
+def handle_unaries(grammar, chart, begin, end):
     revrules = grammar['revrules']
     start_symbol = grammar['start_symbol']
 
@@ -245,13 +245,12 @@ def cky_parser(grammar, tokens):
                         chartItem(prob, index + 1, [token])
         else:
             # handle unknown words
-            print "Unknown word:", token
             possible_tags = rulebased_postag(token)
             for tag in possible_tags:
                 prob = rules[tag][UNKNOWN]
                 chart[index, index + 1][tag] = \
                     chartItem(prob, index + 1, [token])
-        check_unaries(grammar, chart, index, index + 1)
+        handle_unaries(grammar, chart, index, index + 1)
     nwords = len(tokens) + 1
     for span in range(2, nwords):
         for begin in range(nwords - span):
@@ -268,15 +267,14 @@ def cky_parser(grammar, tokens):
                                 if p_root < p_:
                                     chart[begin, end][root] = \
                                         chartItem(p_, split, [B, C])
-                check_unaries(grammar, chart, begin, end)
+                handle_unaries(grammar, chart, begin, end)
     return chart
 
 
 def viterbi(chart, root, begin, end):
     if root in chart[begin, end]:
         tree = [root]
-        next_node, data = max(chart[begin, end].items(), key=lambda item: item[1].prob)
-        #print "%s: %s, %s" % (begin, next_node, data)
+        data = chart[begin, end][root]
         if len(data.children) == 1:
             if data.children[0] == root:
                 tree.append(data.children[0])
@@ -296,12 +294,39 @@ def viterbi(chart, root, begin, end):
 
 
 def debinarize_tree(tree):
-    return tree
+    if isinstance(tree, basestring):
+        return tree
+
+    found_at = False
+    new_tree = [tree[0]]
+    for subtree in tree[1:]:
+        if not isinstance(subtree, basestring) and "@" in subtree[0]:
+            found_at = True
+            new_tree.extend(debinarize_tree(subtree[1:]))
+        else:
+            new_tree.append(debinarize_tree(subtree))
+    if found_at:
+        return debinarize_tree(new_tree)
+
+    if "%%%%%" in tree[0]:
+        print "unary"
+        new_tree = []
+        for subtree in tree[1:]:
+            new_tree.append(debinarize_tree(subtree))
+        unary_tags = tree[0].split("%%%%%")
+        for unary_tag in reversed(unary_tags):
+            new_tree = [unary_tag, new_tree]
+        return new_tree
+
+    new_tree = []
+    for node in tree:
+        new_tree.append(debinarize_tree(node))
+    return new_tree
 
 
 def tree_to_string(tree):
     if isinstance(tree, basestring):
-        return str(tree)
+        return tree
     return "(" + " ".join([tree_to_string(node) for node in tree]) + ")"
 
 
@@ -319,16 +344,7 @@ def test(tokens):
     print "Parsing '%s'" % " ".join(tokens)
     chart = cky_parser(g, tokens)
     print "Chart size:", len(chart)
-    #chartprint(chart)
     print "Viterbi-time!"
-    print tree_to_string(debinarize_tree(
-        viterbi(chart, g['start_symbol'], 0, len(tokens))))
+    print \
+        viterbi(chart, g['start_symbol'], 0, len(tokens))
     return chart
-
-def chartprint(chart):
-    i = 0
-    for key, innerdict in chart.items():
-        for innerkey, value in innerdict.items():
-            i += 1
-            print "%s, %s -> %s" % (key, innerkey, " ".join(value.children))
-    print "Total size: %d" % i
